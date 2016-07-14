@@ -104,42 +104,46 @@ namespace astar
 	template<class NodeTy>
 	struct Node
 	{
+		/*
 		class Hash
 		{
+		public:
 			unsigned operator()(const Node& node)
 			{
 				return std::hash<std::string>()(node.value);
 			}
 		};
+		 */
+		class Comparator
+		{
+		public:
+			bool operator()(const Node<NodeTy>& lhs, const Node<NodeTy>& rhs)
+			{
+				if (lhs.f <= rhs.f)
+					return true;
+				else
+					return false;
+			}
+		};
 
+
+		Node() {}
 		Node(NodeTy val_, unsigned g_, unsigned f_) : value(val_), g(g_), f(f_) {}
-		Node(const NodeTy& n) : value(n), g(0), f(0)
+		Node(const Node& other) : value(other.value), g(other.g), f(other.f)
 		{
 
+		}
+		Node& operator=(const Node& rhs)
+		{
+			this-> value = rhs.value;
+			this->g = rhs.g;
+			this->f = rhs.f;
+			return *this;
 		}
 		NodeTy value;
 		unsigned g;
 		unsigned f;
 	};
-
-	template<class NodeTy>
-	bool operator<(const Node<NodeTy>& lhs, const Node<NodeTy>& rhs)
-	{
-		if (lhs.f <= rhs.f)
-			return true;
-		else
-			return false;
-	}
-
-	template<class NodeTy>
-	bool operator==(const Node<NodeTy>& lhs, const Node<NodeTy>& rhs)
-	{
-		if (lhs.f == rhs.f)
-			return true;
-		else
-			return false;
-	}
-
 
 
 
@@ -154,23 +158,26 @@ namespace astar
 		virtual Path findPath(NodeTy start, NodeTy target)
 		{
 			std::unordered_set<NodeTy>				closedSet;
-			std::set<CNode>						openSet;
+			std::unordered_map<NodeTy, CNode>		openSetLookup;
+			std::set<CNode, typename CNode::Comparator>						openSetOrdered;
 			std::unordered_map<NodeTy, NodeTy>   cameFrom;
 
 			CNode startN(start, 0, Heuristic()(start, target));
-			openSet.insert(startN);
+			openSetOrdered.insert(startN);
+			openSetLookup[start] = startN;
 
 			if(startN.value == target)
 			{
 				return Path(std::vector<NodeTy>{start});
 			}
 
-			while (!openSet.empty())
+			while (!openSetOrdered.empty())
 			{
-				const CNode currentN = *(openSet.begin());
+				const CNode currentN = *(openSetOrdered.begin());
 				if (currentN.value == target)
 					return reconstructPath(cameFrom, currentN.value);
-				openSet.erase(openSet.begin());
+				openSetOrdered.erase(openSetOrdered.begin());
+				openSetLookup.erase(currentN.value);
 				closedSet.insert(currentN.value);
 				std::vector<NodeTy> nbs = this->_neighborGenerator->generateNeighbors(currentN.value);
 				for (const NodeTy& n : nbs)
@@ -178,13 +185,14 @@ namespace astar
 					if (closedSet.find(n) != closedSet.end())
 						continue;
 					unsigned tentativeScore = currentN.g + 1;	// we add 1 as the distance from current to neighbor is always one
-					typename std::set<CNode>::iterator it = openSet.find(n);
-					if (it != openSet.end() && tentativeScore >= it->g)
+					const auto& it = openSetLookup.find(n);
+					if (it != openSetLookup.end() && tentativeScore >= it->second.g)
 						continue;
 
 					CNode neighborNode(n, tentativeScore, tentativeScore + Heuristic()(n, target));
 					cameFrom[n] = currentN.value;
-					openSet.insert(neighborNode);
+					openSetOrdered.insert(neighborNode);
+					openSetLookup[n] = neighborNode;
 				}
 			}
 
@@ -316,7 +324,7 @@ private:
 class CharDifference
 {
 public:
-	unsigned operator()(std::string current, std::string target)
+	unsigned operator()(const std::string& current, const std::string& target)
 	{
 		unsigned count = 0;
 		for (int i = 0; i < current.size(); i++)
