@@ -1,0 +1,16 @@
+IDIR =.
+CC=g++
+CFLAGS=-I$(IDIR) -O2 -DDEBUG -pthread -g --std=c++11 -fpermissive
+
+ODIR=../obj
+
+LIBS=-lm
+
+
+cout: dicdash.cpp
+	g++ -o ../bin/dicdash dicdash.cpp $(CFLAGS)
+
+.PHONY: clean
+
+clean:
+	rm -f $(ODIR)/*.o
