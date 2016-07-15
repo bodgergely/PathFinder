@@ -1,5 +1,7 @@
 #include <string>
-#include "dicdash.h"
+#include <fstream>
+#include <iostream>
+#include "DictionaryDash.h"
 
 using namespace std;
 

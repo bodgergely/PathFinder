@@ -1,4 +1,4 @@
-#include "dicdash.h"
+#include "DictionaryDash.h"
 #include <gtest/gtest.h>
 #include <random>
 #include <string>
@@ -12,6 +12,8 @@
 using namespace std;
 
 using Path = DictionaryDash::Path;
+
+
 
 string generateRandomWord(int len)
 {
@@ -86,50 +88,110 @@ TEST(DictionaryDash,reachItself)
 
 #ifndef _WIN32
 
-TEST(DictionaryDash, realDictionary)
+struct TimingAvgs
+{
+	TimingAvgs() : astar(0.0), bfs(0.0){}
+	TimingAvgs(double astar_, double bfs_) : astar(astar_), bfs(bfs_) {}
+	double astar;
+	double bfs;
+};
+
+TimingAvgs testWordSize(int wordlen, bool verbose)
 {
 	unordered_set<string> wordSet;
 	vector<string> words;
-	for(int i=3;i<9;i++)
+	if(verbose)
+		cout << "Word size: " << wordlen << endl;
+	populateDictionary(wordSet, wordlen);
+	for(const string& w : wordSet)
 	{
-		cout << "Word size: " << i << endl;
-		populateDictionary(wordSet, i);
-		for(const string& w : wordSet)
+		words.push_back(w);
+	}
+	wordSet.clear();
+
+	double astarDurAvg = 0;
+	double bfsDurAvg = 0;
+
+	int attempts = 0;
+	while(true)
+	{
+		unsigned seed = std::chrono::system_clock::now().time_since_epoch().count();
+		std::minstd_rand0 generator (seed);
+		std::uniform_int_distribution<int> distribution(0,words.size()-1);
+		string start = words[distribution(generator)];
+		string target = words[distribution(generator)];
+
+
+		DictionaryDash dd_astar(words, start.size(), Algo::AStar);
+		DictionaryDash dd_bfs(words, start.size(), Algo::BreadthFirstSearch);
+
+		auto startAStar = std::chrono::system_clock::now();
+		Path astarPath = dd_astar.path(start, target);
+		auto endAStar = std::chrono::system_clock::now();
+		Path bfsPath = dd_bfs.path(start, target);
+		auto endBFS = std::chrono::system_clock::now();
+
+
+		auto astarDur = std::chrono::duration_cast<std::chrono::microseconds>(endAStar-startAStar);
+		auto bfsDur = std::chrono::duration_cast<std::chrono::microseconds>(endBFS-endAStar);
+		++attempts;
+		astarDurAvg+=(double)astarDur.count(); astarDurAvg/=(double)attempts;
+		bfsDurAvg+=(double)bfsDur.count(); bfsDurAvg/=(double)attempts;
+
+		EXPECT_EQ(astarPath.pathLen(),bfsPath.pathLen());
+		if(astarPath.pathLen()!=-1)
 		{
-			words.push_back(w);
-		}
-		wordSet.clear();
-
-		int attempts = 0;
-		while(true)
-		{
-			//cout << "Attempts to reach: " << ++attempts << endl;
-			unsigned seed = std::chrono::system_clock::now().time_since_epoch().count();
-			std::minstd_rand0 generator (seed);
-			std::uniform_int_distribution<int> distribution(0,words.size()-1);
-			string start = words[distribution(generator)];
-			string target = words[distribution(generator)];
-
-			//cout << "start: " << start << " target: " << target << endl;
-
-			DictionaryDash dd_astar(words, start.size(), Algo::AStar);
-			DictionaryDash dd_bfs(words, start.size(), Algo::BreadthFirstSearch);
-			Path astarPath = dd_astar.path(start, target);
-			Path bfsPath = dd_bfs.path(start, target);
-			EXPECT_EQ(astarPath.pathLen(),bfsPath.pathLen());
-			if(astarPath.pathLen()!=-1)
+			if(verbose)
 			{
 				cout << "start: " << start << " target: " << target << endl;
 				cout << "AStar steps: " << astarPath.pathLen() << " Path: " << astarPath.toString() << endl;
 				cout << "BFS steps: " << bfsPath.pathLen() << " Path: " << bfsPath.toString() << endl;
-				break;
 			}
+			break;
 		}
-
-		words.clear();
-
-
 	}
+
+	return TimingAvgs(astarDurAvg, bfsDurAvg);
+}
+
+map<int, TimingAvgs> testWordSizes(int minLen, int maxLen, bool verbose)
+{
+	map<int, TimingAvgs> timings;
+	for(int wordlen=minLen;wordlen<=maxLen;wordlen++)
+	{
+			TimingAvgs times = testWordSize(wordlen, verbose);
+			timings[wordlen] = times;
+	}
+	return timings;
+}
+
+TEST(DictionaryDash, realDictionary)
+{
+	testWordSizes(3,8, true);
+}
+
+TEST(DictionaryDash, realDictionaryStressTest)
+{
+	int totalTests = 15;
+	map<int, TimingAvgs> stressTimes;
+	for(int i=1;i<=totalTests;i++)
+	{
+		cout << "Test: " << i << " of " << totalTests << endl;
+		map<int, TimingAvgs> times = testWordSizes(3,8, false);
+		for(const pair<int, TimingAvgs>& time : times)
+		{
+			TimingAvgs& avg = stressTimes[time.first];
+			avg.astar+=time.second.astar; avg.astar/=(double)i;
+			avg.bfs+=time.second.bfs; avg.bfs/=(double)i;
+		}
+	}
+
+	cout << "Avg calculation times (microsecs): \n";
+	for(const auto& p : stressTimes)
+	{
+		cout << "Word len : " << p.first << "\tAStar: " << p.second.astar << " BFS: " << p.second.bfs << " Diff: " << abs(p.second.astar - p.second.bfs) << endl;
+	}
+
 
 }
 
