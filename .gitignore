@@ -2,3 +2,6 @@
 Debug/
 packages/
 x64/
+App/x64/
+TestPathFinder/x64
+PathFinderLib/x64

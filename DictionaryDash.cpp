@@ -1,3 +1,5 @@
+#include "stdafx.h"
+
 
 #include "DictionaryDash.h"
 
@@ -27,13 +29,13 @@ std::vector<std::string> DictionaryDashNeighborGenerator::generateNeighbors(std:
 }
 
 DictionaryDash::DictionaryDash(const std::vector<std::string>& dictionary, unsigned wordLen, Algo algo) :
-_wordLen(wordLen)
+	_wordLen(wordLen)
 {
 	_populateDictionary(dictionary);
 
 	std::shared_ptr<DictionaryDashNeighborGenerator> nb(new DictionaryDashNeighborGenerator(_dict));
 	if (algo == Algo::AStar)
-		_pathFinder = std::unique_ptr<PathFinder<std::string>>(new astar::AStar<std::string,CharDifference>(nb));
+		_pathFinder = std::unique_ptr<PathFinder<std::string>>(new astar::AStar<std::string, CharDifference>(nb));
 	else
 		_pathFinder = std::unique_ptr<PathFinder<std::string>>(new bfs::BreadthFirstSearch<std::string>(nb));
 
@@ -56,6 +58,6 @@ void DictionaryDash::_populateDictionary(const std::vector<std::string>& diction
 
 DictionaryDash::Path DictionaryDash::path(const std::string& start, const std::string& target)
 {
-	DictionaryDash::Path path =  _pathFinder->findPath(start, target);
+	DictionaryDash::Path path = _pathFinder->findPath(start, target);
 	return path;
 }
